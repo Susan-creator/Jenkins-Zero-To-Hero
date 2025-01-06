@@ -1,0 +1,76 @@
+pipeline {
+    agent none // No default agent; each stage defines its own
+    stages {
+        stage('Back-end Build') {
+            agent {
+                docker { image 'maven:3.8.1-adoptopenjdk-11' }
+            }
+            steps {
+                echo "Building the back-end application..."
+                sh 'mvn clean package'
+            }
+        }
+        stage('Front-end Build') {
+            agent {
+                docker { image 'node:16-alpine' }
+            }
+            steps {
+                echo "Building the front-end application..."
+                sh '''
+                npm install
+                npm run build
+                '''
+            }
+        }
+        stage('Database Setup') {
+            agent {
+                docker { image 'mysql:8.0' }
+            }
+            environment {
+                MYSQL_ROOT_PASSWORD = 'rootpass'
+                MYSQL_DATABASE = 'myappdb'
+                MYSQL_USER = 'myuser'
+                MYSQL_PASSWORD = 'mypassword'
+            }
+            steps {
+                echo "Setting up the database..."
+                sh '''
+                echo "Waiting for the database to be ready..."
+                sleep 10
+                echo "Creating a test table..."
+                mysql -h 127.0.0.1 -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE -e "CREATE TABLE test_table (id INT PRIMARY KEY, name VARCHAR(50));"
+                '''
+            }
+        }
+        stage('Test') {
+            agent {
+                docker { image 'maven:3.8.1-adoptopenjdk-11' }
+            }
+            steps {
+                echo "Running back-end tests..."
+                sh 'mvn test'
+            }
+        }
+        stage('Deploy') {
+            agent any // Use Jenkins agent for deployment
+            steps {
+                echo "Deploying the application..."
+                sh '''
+                echo "Deploying back-end and front-end artifacts..."
+                # Placeholder for actual deployment commands
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            echo "Pipeline execution completed."
+        }
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed."
+        }
+    }
+}
